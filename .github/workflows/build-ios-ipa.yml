@@ -1,0 +1,60 @@
+name: Build iOS Unsigned IPA for Sideloadly (iPhone 16 Pro Max)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'Chế độ biên dịch iOS (release khuyên dùng cho iPhone 16 Pro Max)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - profile
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build_unsigned_ipa:
+    name: Build Unsigned IPA (macOS Runner)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK (Stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Prepare Flutter & CocoaPods Dependencies
+        run: |
+          flutter pub get
+          if [ ! -f "ios/Podfile" ]; then
+            flutter build ios --config-only --no-codesign
+          fi
+          sed -i '' "s/# platform :ios, .*/platform :ios, '15.0'/g" ios/Podfile || true
+          cd ios
+          pod install --repo-update
+
+      - name: Build iOS App (No Codesign for Sideloadly)
+        run: |
+          flutter build ios --${{ inputs.build_mode || 'release' }} --no-codesign
+
+      - name: Package Runner.app into Unsigned .ipa for Sideloadly
+        run: |
+          mkdir -p build/ios/ipa_payload/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/ipa_payload/Payload/Runner.app
+          cd build/ios/ipa_payload
+          zip -r -9 ../EMarket-iOS-Sideloadly.ipa Payload
+
+      - name: Upload IPA Artifact for Sideloadly
+        uses: actions/upload-artifact@v4
+        with:
+          name: EMarket-iOS-Sideloadly-IPA
+          path: build/ios/EMarket-iOS-Sideloadly.ipa
+          if-no-files-found: error
+          retention-days: 14
