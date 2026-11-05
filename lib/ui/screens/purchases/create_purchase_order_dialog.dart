@@ -37,7 +37,6 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
   bool _isLoading = true;
   bool _isSubmitting = false;
 
-  List<SupplierModel> _suppliers = [];
   List<WarehouseModel> _warehouses = [];
 
   SupplierModel? _selectedSupplier;
@@ -65,17 +64,14 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
     final branchId = auth.effectiveBranchId;
 
     try {
-      final results = await Future.wait([
-        _repo.getSuppliers(),
-        _repo.getWarehousesByBranch(branchId),
-      ]);
+      final warehouses = await _repo.getWarehousesByBranch(branchId);
 
       if (mounted) {
         setState(() {
-          _suppliers = results[0] as List<SupplierModel>;
-          _warehouses = results[1] as List<WarehouseModel>;
+          _warehouses = warehouses;
 
-          if (_suppliers.isNotEmpty) _selectedSupplier = _suppliers.first;
+          // Để trống _selectedSupplier ban đầu để người dùng bắt buộc phải chọn NCC
+          _selectedSupplier = null;
           if (_warehouses.isNotEmpty) _selectedWarehouse = _warehouses.first;
           _isLoading = false;
         });
@@ -88,16 +84,46 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
   Future<void> _pickSupplier() async {
     final s = await SupplierSearchPickerModal.show(context);
     if (s != null && mounted) {
+      if (_selectedSupplier != null && _selectedSupplier!.supplierId != s.supplierId && _items.isNotEmpty) {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Đổi Nhà cung cấp?'),
+            content: const Text('Đổi Nhà cung cấp sẽ xóa danh sách sản phẩm đã chọn của NCC trước đó. Bạn có chắc muốn tiếp tục?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+                child: const Text('Đồng ý'),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) return;
+        _items.clear();
+      }
       setState(() => _selectedSupplier = s);
     }
   }
 
   Future<void> _pickProductToAdd() async {
-    final auth = context.read<AuthProvider>();
+    if (_selectedSupplier == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.error,
+          content: Text('Vui lòng chọn Nhà cung cấp trước khi chọn sản phẩm!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final product = await ProductSearchPickerModal.show(
       context,
-      branchId: auth.effectiveBranchId,
-      title: 'Chọn sản phẩm nhập kho',
+      supplierId: _selectedSupplier!.supplierId,
+      title: 'Chọn sản phẩm (${_selectedSupplier!.name})',
       showCostPrice: true,
     );
 
@@ -113,6 +139,8 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
             product: product,
             quantity: 1,
             unitPrice: (product.costPrice > 0 ? product.costPrice : product.retailPrice * 0.7).toDouble(),
+            manufacturingDate: DateTime.now(),
+            expiryDate: DateTime.now().add(const Duration(days: 365)),
           ));
         });
       }
@@ -176,6 +204,16 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
         unit: (item.product.unit != null && item.product.unit!.trim().isNotEmpty) ? item.product.unit!.trim() : 'Cái',
         unitPrice: item.unitPrice,
         totalPrice: item.quantity * item.unitPrice,
+        manufacturingDate: item.manufacturingDate,
+        expiryDate: item.expiryDate,
+        productLots: [
+          {
+            'ProductId': item.product.productId,
+            'CostPrice': item.unitPrice,
+            'ManufacturingDate': item.manufacturingDate.toIso8601String(),
+            'ExpiryDate': item.expiryDate.toIso8601String(),
+          }
+        ],
       );
     }).toList();
 
@@ -258,11 +296,14 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : Column(
@@ -271,33 +312,36 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
                   children: [
                     // Header
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(9),
                           decoration: BoxDecoration(
                             color: Colors.deepPurple.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.inventory_2_rounded, color: Colors.deepPurple, size: 24),
+                          child: const Icon(Icons.inventory_2_rounded, color: Colors.deepPurple, size: 22),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Tạo Phiếu Nhập Hàng (Inbound)',
-                                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                               ),
                               Text(
                                 'Nhập hàng từ NCC & tăng tồn kho tự động',
-                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                               ),
                             ],
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 22),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -447,7 +491,7 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
                                       TextButton.icon(
                                         onPressed: _pickProductToAdd,
                                         icon: const Icon(Icons.search_rounded, size: 16),
-                                        label: const Text('Tìm trong 1.000+ sản phẩm'),
+                                        label: Text(_selectedSupplier != null ? 'Tìm sản phẩm của ${_selectedSupplier!.name}' : 'Chọn Nhà cung cấp trước để thêm sản phẩm'),
                                       ),
                                     ],
                                   ),
@@ -701,6 +745,110 @@ class _CreatePurchaseOrderDialogState extends State<CreatePurchaseOrderDialog> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+
+          // Date Pickers: Ngày sản xuất (NSX) & Hạn sử dụng (HSD)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                // NSX
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: item.manufacturingDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                        helpText: 'Chọn Ngày sản xuất (NSX)',
+                      );
+                      if (picked != null) {
+                        setState(() => item.manufacturingDate = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.event_available_rounded, size: 16, color: Colors.teal),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('NSX (Ngày SX)', style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+                                Text(
+                                  Formatters.formatDate(item.manufacturingDate),
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Container(width: 1, height: 26, color: AppColors.border),
+                const SizedBox(width: 8),
+
+                // HSD
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: item.expiryDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                        helpText: 'Chọn Hạn sử dụng (HSD)',
+                      );
+                      if (picked != null) {
+                        setState(() => item.expiryDate = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.event_busy_rounded,
+                            size: 16,
+                            color: item.expiryDate.isBefore(DateTime.now()) ? AppColors.error : Colors.deepOrange,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('HSD (Hạn dùng)', style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+                                Text(
+                                  Formatters.formatDate(item.expiryDate),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: item.expiryDate.isBefore(DateTime.now()) ? AppColors.error : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -711,10 +859,15 @@ class _PurchaseItemDraft {
   final ProductModel product;
   int quantity;
   double unitPrice;
+  DateTime manufacturingDate;
+  DateTime expiryDate;
 
   _PurchaseItemDraft({
     required this.product,
     required this.quantity,
     required this.unitPrice,
-  });
+    DateTime? manufacturingDate,
+    DateTime? expiryDate,
+  })  : manufacturingDate = manufacturingDate ?? DateTime.now(),
+        expiryDate = expiryDate ?? DateTime.now().add(const Duration(days: 365));
 }

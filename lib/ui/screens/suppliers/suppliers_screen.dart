@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/utils/device_launcher_helper.dart';
@@ -6,9 +7,11 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/utils/responsive_layout.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/repositories/data_repository.dart';
+import '../../../providers/auth_provider.dart';
 import '../../widgets/flat_card.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/vnd_text.dart';
+import '../main_navigation_screen.dart';
 import 'add_edit_supplier_dialog.dart';
 import 'supplier_detail_screen.dart';
 
@@ -43,14 +46,22 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
+    final auth = context.read<AuthProvider>();
+    final currentUser = auth.currentUser;
+    final isSupplier = currentUser?.isSupplier == true;
+    final scopedSupplierId = currentUser?.supplierId;
+
     try {
       final results = await Future.wait([
         _repo.getSuppliers(),
-        _repo.getSupplierDebtSummary(),
-        _repo.getSupplierDebts(),
+        _repo.getSupplierDebtSummary(supplierId: isSupplier ? scopedSupplierId : null),
+        _repo.getSupplierDebts(supplierId: isSupplier ? scopedSupplierId : null),
       ]);
       if (mounted) {
-        final rawSuppliers = results[0] as List<SupplierModel>;
+        var rawSuppliers = results[0] as List<SupplierModel>;
+        if (isSupplier && scopedSupplierId != null && scopedSupplierId > 0) {
+          rawSuppliers = rawSuppliers.where((s) => s.supplierId == scopedSupplierId).toList();
+        }
         final summary = results[1] as SupplierDebtSummaryModel;
         final debts = results[2] as List<SupplierDebtModel>;
 
@@ -225,6 +236,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
           appBar: AppBar(
+            automaticallyImplyLeading: MainNavigationScreen.shouldImplyLeading(context),
+            leading: MainNavigationScreen.buildLeadingMenuButton(context),
             backgroundColor: Colors.white,
             elevation: 0,
             surfaceTintColor: Colors.transparent,
@@ -232,9 +245,11 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               preferredSize: const Size.fromHeight(1),
               child: Container(color: AppColors.border, height: 1),
             ),
-            title: const Text(
-              'Nhà cung cấp & Công nợ',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            title: Text(
+              context.watch<AuthProvider>().currentUser?.isSupplier == true
+                  ? 'Công nợ Nhà cung cấp'
+                  : 'Nhà cung cấp & Công nợ',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
             ),
             actions: [
               IconButton(
@@ -245,20 +260,22 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               const SizedBox(width: 8),
             ],
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            heroTag: null,
-            backgroundColor: AppColors.primaryBrand,
-            foregroundColor: Colors.white,
-            elevation: 3,
-            icon: const Icon(Icons.add_business_rounded, size: 20),
-            label: const Text('Thêm NCC', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            onPressed: () {
-              AddEditSupplierDialog.show(
-                context,
-                onSaved: _loadData,
-              );
-            },
-          ),
+          floatingActionButton: context.watch<AuthProvider>().currentUser?.isSupplier == true
+              ? null
+              : FloatingActionButton.extended(
+                  heroTag: null,
+                  backgroundColor: AppColors.primaryBrand,
+                  foregroundColor: Colors.white,
+                  elevation: 3,
+                  icon: const Icon(Icons.add_business_rounded, size: 20),
+                  label: const Text('Thêm NCC', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  onPressed: () {
+                    AddEditSupplierDialog.show(
+                      context,
+                      onSaved: _loadData,
+                    );
+                  },
+                ),
           body: Center(
             child: Container(
               constraints: const BoxConstraints(maxWidth: 1400),
@@ -561,28 +578,30 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
               const Spacer(),
 
-              // Quick Actions
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 17, color: AppColors.textSecondary),
-                tooltip: 'Sửa NCC',
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                padding: EdgeInsets.zero,
-                onPressed: () {
-                  AddEditSupplierDialog.show(
-                    context,
-                    supplier: supplier,
-                    onSaved: _loadData,
-                  );
-                },
-              ),
-              if (supplier.debtAmount <= 0)
+              // Quick Actions (Chỉ dành cho Quản lý / Nhân viên nội bộ EMarket)
+              if (context.read<AuthProvider>().currentUser?.isSupplier != true) ...[
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 17, color: AppColors.error),
-                  tooltip: 'Xóa NCC',
+                  icon: const Icon(Icons.edit_outlined, size: 17, color: AppColors.textSecondary),
+                  tooltip: 'Sửa NCC',
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   padding: EdgeInsets.zero,
-                  onPressed: () => _deleteSupplier(supplier),
+                  onPressed: () {
+                    AddEditSupplierDialog.show(
+                      context,
+                      supplier: supplier,
+                      onSaved: _loadData,
+                    );
+                  },
                 ),
+                if (supplier.debtAmount <= 0)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 17, color: AppColors.error),
+                    tooltip: 'Xóa NCC',
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => _deleteSupplier(supplier),
+                  ),
+              ],
             ],
           ),
         ],

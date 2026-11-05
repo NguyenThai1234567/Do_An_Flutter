@@ -271,11 +271,17 @@ class AppDrawer extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.store_rounded, size: 14, color: AppColors.secondary),
+                    Icon(
+                      user?.isSupplier == true ? Icons.local_shipping_outlined : Icons.store_rounded,
+                      size: 14,
+                      color: AppColors.secondary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        auth.selectedBranch?.branchName ?? 'Chưa chọn cơ sở',
+                        user?.isSupplier == true
+                            ? 'Đối tác Nhà cung cấp'
+                            : (auth.selectedBranch?.branchName ?? 'Chưa chọn cơ sở'),
                         style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w500),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -295,6 +301,14 @@ class AppDrawer extends StatelessWidget {
             children: [
               // SECTION 1: CÁC TAB CHÍNH (NAVBAR QUICK JUMP)
               _buildSectionHeader('ĐIỀU HƯỚNG CHÍNH'),
+              if (user?.isSupplier == true)
+                _buildDrawerItem(
+                  icon: Icons.account_balance_wallet_rounded,
+                  iconColor: Colors.teal,
+                  title: 'Công nợ của tôi (EMarket nợ)',
+                  isSelected: activeModule == 'SupplierModule',
+                  onTap: () => _navigateToModule(context, user, 'SupplierModule', const SuppliersScreen()),
+                ),
               if (user?.canAccessDashboard == true)
                 _buildDrawerItem(
                   icon: Icons.dashboard_rounded,
@@ -399,12 +413,13 @@ class AppDrawer extends StatelessWidget {
 
               // SECTION 5: TRÍ TUỆ NHÂN TẠO & HỆ THỐNG
               _buildSectionHeader('CÔNG NGHỆ & THIẾT LẬP'),
-              _buildDrawerItem(
-                icon: Icons.smart_toy_rounded,
-                iconColor: const Color(0xFF673AB7),
-                title: 'Trợ lý AI & Voice Labs',
-                onTap: () => _pushScreen(context, const AIAssistantScreen()),
-              ),
+              if (user?.canAccessAiChat == true)
+                _buildDrawerItem(
+                  icon: Icons.smart_toy_rounded,
+                  iconColor: const Color(0xFF673AB7),
+                  title: 'Trợ lý AI & Voice Labs',
+                  onTap: () => _pushScreen(context, const AIAssistantScreen()),
+                ),
               _buildDrawerItem(
                 icon: Icons.dns_rounded,
                 iconColor: AppColors.textSecondary,

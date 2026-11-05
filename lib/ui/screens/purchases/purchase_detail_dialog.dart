@@ -103,7 +103,10 @@ class _PurchaseDetailDialogState extends State<PurchaseDetailDialog> {
         details: _order!.details,
       );
 
-      final success = await _repo.updatePurchase(updatedOrder);
+      bool success = await _repo.updatePurchaseStatus(_order!.purchaseOrderId, 'Completed', notes: _order!.notes);
+      if (!success) {
+        success = await _repo.updatePurchase(updatedOrder);
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         if (success) {
@@ -180,7 +183,10 @@ class _PurchaseDetailDialogState extends State<PurchaseDetailDialog> {
         details: _order!.details,
       );
 
-      final success = await _repo.updatePurchase(updatedOrder);
+      bool success = await _repo.updatePurchaseStatus(_order!.purchaseOrderId, 'Cancelled', notes: _order!.notes);
+      if (!success) {
+        success = await _repo.updatePurchase(updatedOrder);
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         if (success) {
@@ -267,10 +273,14 @@ class _PurchaseDetailDialogState extends State<PurchaseDetailDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
+        constraints: BoxConstraints(
+          maxWidth: 520,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(18),
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _order == null
@@ -279,42 +289,56 @@ class _PurchaseDetailDialogState extends State<PurchaseDetailDialog> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Header
+                        // Header (Tối ưu chống tràn/lẹm vào nút đóng trên iPhone 16 Pro Max)
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(10),
+                              padding: const EdgeInsets.all(9),
                               decoration: BoxDecoration(
                                 color: AppColors.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 24),
+                              child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 22),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      Text(
-                                        'Phiếu nhập #${_order!.purchaseOrderId}',
-                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                      Flexible(
+                                        child: Text(
+                                          'Phiếu nhập #${_order!.purchaseOrderId}',
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      _buildStatusBadge(_order!.status),
                                     ],
                                   ),
-                                  if (_order!.orderDate != null)
-                                    Text(
-                                      Formatters.formatDateTime(_order!.orderDate),
-                                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                    ),
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    children: [
+                                      _buildStatusBadge(_order!.status),
+                                      if (_order!.orderDate != null)
+                                        Text(
+                                          Formatters.formatDateTime(_order!.orderDate),
+                                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                        ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 22),
                               onPressed: () => Navigator.pop(context),
                             ),
                           ],
@@ -405,8 +429,10 @@ class _PurchaseDetailDialogState extends State<PurchaseDetailDialog> {
                                                 ),
                                                 const SizedBox(height: 2),
                                                 Text(
-                                                  '${item.quantity} x ${Formatters.formatVND(item.unitPrice)}',
-                                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                                  '${item.quantity} x ${Formatters.formatVND(item.unitPrice)}'
+                                                  '${item.manufacturingDate != null ? ' | NSX: ${Formatters.formatDate(item.manufacturingDate)}' : ''}'
+                                                  '${item.expiryDate != null ? ' | HSD: ${Formatters.formatDate(item.expiryDate)}' : ''}',
+                                                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                                 ),
                                               ],
                                             ),

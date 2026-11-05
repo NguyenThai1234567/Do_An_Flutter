@@ -7,7 +7,7 @@ import '../models/product_model.dart';
 class ProductApiService {
   final ApiClient _client = ApiClient();
 
-  /// Get Products with Pagination and Filters
+  /// Get Products with Pagination and Filters (supports supplierId)
   Future<ProductPagedResponse> getProductsPaged({
     int start = 0,
     int length = 20,
@@ -15,6 +15,7 @@ class ProductApiService {
     int? categoryId,
     int? branchId,
     int? warehouseId,
+    int? supplierId,
   }) async {
     final queryParams = <String, dynamic>{
       'start': start,
@@ -23,18 +24,40 @@ class ProductApiService {
       if (categoryId != null && categoryId > 0) 'categoryId': categoryId,
       if (branchId != null && branchId > 0) 'branchId': branchId,
       if (warehouseId != null && warehouseId > 0) 'warehouseId': warehouseId,
+      if (supplierId != null && supplierId > 0) 'supplierId': supplierId,
     };
 
+    // 1. Query standard pagedProducts endpoint
     try {
       final res = await _client.get(
         ApiEndpoints.pagedProducts,
         queryParameters: queryParams,
       );
 
-      return ProductPagedResponse.fromJson(res.data);
-    } catch (_) {
-      return ProductPagedResponse(total: 0, filtered: 0, data: []);
-    }
+      final paged = ProductPagedResponse.fromJson(res.data);
+      if (paged.data.isNotEmpty) {
+        return paged;
+      }
+    } catch (_) {}
+
+    // 2. Fallback to /Admin/Product/GetAllProduct (or api/admin/product/GetAllProduct)
+    try {
+      final fallback = await _client.get(
+        'Admin/Product/GetAllProduct',
+        queryParameters: {
+          if (keyword != null && keyword.trim().isNotEmpty) 'keyWord': keyword.trim(),
+          if (supplierId != null && supplierId > 0) 'supplierId': supplierId,
+          if (branchId != null && branchId > 0) 'branchId': branchId,
+          if (categoryId != null && categoryId > 0) 'categoryId': categoryId,
+        },
+      );
+      final paged = ProductPagedResponse.fromJson(fallback.data);
+      if (paged.data.isNotEmpty) {
+        return paged;
+      }
+    } catch (_) {}
+
+    return ProductPagedResponse(total: 0, filtered: 0, data: []);
   }
 
   /// Search products by barcode or text (supports scanner, camera & manual typing)

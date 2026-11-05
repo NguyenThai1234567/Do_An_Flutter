@@ -107,6 +107,24 @@ class UserModel {
 
     final rawIsAdmin = json['isAdmin'] ?? json['IsAdmin'] ?? false;
     final rawIsSupplier = json['isSupplier'] ?? json['IsSupplier'] ?? false;
+    final parsedSupplierId = (json['supplierId'] ?? json['SupplierId'] ?? json['supplier_id'] ?? json['Supplier_Id'] as num?)?.toInt();
+    final parsedRoles = parseRoles();
+    final isSupplierRole = parsedRoles.any((r) =>
+        r.roleId == 6 ||
+        r.roleName.toLowerCase().contains('nhà cung cấp') ||
+        r.roleName.toLowerCase().contains('nha cung cap') ||
+        r.roleName.toLowerCase().contains('cung cấp') ||
+        r.roleName.toLowerCase().contains('cung cap') ||
+        r.roleName.toLowerCase().contains('ncc') ||
+        r.roleName.toLowerCase().contains('supplier') ||
+        r.roleName.toLowerCase().contains('đối tác') ||
+        r.roleName.toLowerCase().contains('doi tac') ||
+        r.roleName.toLowerCase().contains('partner'));
+
+    final bool isSupplierFinal = rawIsSupplier == true ||
+        rawIsSupplier.toString().toLowerCase() == 'true' ||
+        (parsedSupplierId != null && parsedSupplierId > 0) ||
+        isSupplierRole;
 
     return UserModel(
       userId: (json['userId'] ?? json['UserId'] ?? json['id'] ?? json['Id'] as num?)?.toInt() ?? 0,
@@ -116,13 +134,13 @@ class UserModel {
       phone: json['phone'] ?? json['Phone'],
       image: json['image'] ?? json['Image'] ?? json['avatar'] ?? json['Avatar'] ?? json['userImg'],
       status: json['status'] ?? json['Status'],
-      branchId: (json['branchId'] ?? json['BranchId'] as num?)?.toInt(),
-      supplierId: (json['supplierId'] ?? json['SupplierId'] as num?)?.toInt(),
+      branchId: isSupplierFinal ? null : (json['branchId'] ?? json['BranchId'] as num?)?.toInt(),
+      supplierId: parsedSupplierId,
       roleId: (json['roleId'] ?? json['RoleId'] as num?)?.toInt() ?? 0,
-      roles: parseRoles(),
+      roles: parsedRoles,
       permissions: parsePermissions(),
       isAdmin: rawIsAdmin == true || rawIsAdmin.toString().toLowerCase() == 'true',
-      isSupplier: rawIsSupplier == true || rawIsSupplier.toString().toLowerCase() == 'true',
+      isSupplier: isSupplierFinal,
     );
   }
 
@@ -152,6 +170,7 @@ class UserModel {
   bool get isActive => !isLocked;
 
   String get primaryRoleName {
+    if (isSupplier) return 'Đối tác Nhà cung cấp';
     if (isAdmin) return 'Quản Trị Viên (System Admin)';
     if (roles.isNotEmpty) return roles.first.roleName;
     return 'Nhân viên';
@@ -159,6 +178,7 @@ class UserModel {
 
   /// Check if user has permission, module access, or is Admin
   bool hasPermission(String permissionOrModule) {
+    if (isSupplier) return false;
     if (isAdmin) return true;
     final key = permissionOrModule.trim().toLowerCase();
     // 1. Check module
@@ -177,15 +197,17 @@ class UserModel {
   }
 
   /// Quyền hạn truy cập các phân hệ nghiệp vụ chính (RBAC Helpers)
-  bool get canAccessSales => isAdmin || hasPermission('SalesModule') || hasPermission('sales') || hasPermission('pos') || hasPermission('order');
-  bool get canAccessProducts => isAdmin || hasPermission('ProductModule') || hasPermission('product');
-  bool get canAccessInventory => isAdmin || hasPermission('InventoryModule') || hasPermission('inventory') || hasPermission('warehouse') || hasPermission('purchase') || hasPermission('stock');
-  bool get canAccessCustomers => isAdmin || hasPermission('CustomerModule') || hasPermission('customer') || hasPermission('sales');
-  bool get canAccessSuppliers => isAdmin || hasPermission('ProductModule') || hasPermission('InventoryModule') || hasPermission('supplier');
-  bool get canAccessQuotations => isAdmin || hasPermission('QuotationModule') || hasPermission('quotation') || hasPermission('sales');
-  bool get canAccessExpenses => isAdmin || hasPermission('ExpenseModule') || hasPermission('expense') || hasPermission('accounting') || hasPermission('cash');
-  bool get canAccessEmployees => isAdmin || hasPermission('UserModule') || hasPermission('user') || hasPermission('employee') || hasPermission('hrm');
-  bool get canAccessDashboard => isAdmin || hasPermission('DashboardModule') || hasPermission('ReportModule') || hasPermission('dashboard') || hasPermission('report');
+  /// Nhà cung cấp (Supplier) chỉ xem công nợ giữa EMarket và NCC đó; không xem doanh số, kho hàng, khách hàng, nhân sự và không dùng AI Chat.
+  bool get canAccessSales => !isSupplier && (isAdmin || hasPermission('SalesModule') || hasPermission('sales') || hasPermission('pos') || hasPermission('order'));
+  bool get canAccessProducts => !isSupplier && (isAdmin || hasPermission('ProductModule') || hasPermission('product'));
+  bool get canAccessInventory => !isSupplier && (isAdmin || hasPermission('InventoryModule') || hasPermission('inventory') || hasPermission('warehouse') || hasPermission('purchase') || hasPermission('stock'));
+  bool get canAccessCustomers => !isSupplier && (isAdmin || hasPermission('CustomerModule') || hasPermission('customer') || hasPermission('sales'));
+  bool get canAccessSuppliers => isSupplier || isAdmin || hasPermission('ProductModule') || hasPermission('InventoryModule') || hasPermission('supplier');
+  bool get canAccessQuotations => !isSupplier && (isAdmin || hasPermission('QuotationModule') || hasPermission('quotation') || hasPermission('sales'));
+  bool get canAccessExpenses => !isSupplier && (isAdmin || hasPermission('ExpenseModule') || hasPermission('expense') || hasPermission('accounting') || hasPermission('cash'));
+  bool get canAccessEmployees => !isSupplier && (isAdmin || hasPermission('UserModule') || hasPermission('user') || hasPermission('employee') || hasPermission('hrm'));
+  bool get canAccessDashboard => !isSupplier && (isAdmin || hasPermission('DashboardModule') || hasPermission('ReportModule') || hasPermission('dashboard') || hasPermission('report'));
+  bool get canAccessAiChat => !isSupplier;
 }
 
 class LoginResponse {

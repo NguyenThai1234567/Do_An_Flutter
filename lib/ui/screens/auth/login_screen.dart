@@ -799,7 +799,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       width: 68,
                       height: 68,
                       decoration: BoxDecoration(
-                        gradient: AppColors.indigoGradient,
+
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -809,10 +809,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.storefront_rounded,
-                        size: 36,
-                        color: Colors.white,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/images/app_icon.png',
+                          width: 68,
+                          height: 68,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),
@@ -1217,7 +1221,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       label: 'Nhà cung cấp',
                       icon: Icons.local_shipping_outlined,
                       color: const Color(0xFFD97706),
-                      onTap: () => _fillDemoAccount('thai1.dktech@gmail.com', 'adminpass'),
+                      onTap: () => _fillDemoAccount('thai.dktech@gmail.com', 'adminpass'),
                     ),
                     _buildQuickDemoChip(
                       label: 'QL Bán hàng',

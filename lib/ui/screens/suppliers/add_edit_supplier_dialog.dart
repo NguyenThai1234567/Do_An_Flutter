@@ -91,6 +91,7 @@ class _AddEditSupplierDialogState extends State<AddEditSupplierDialog> {
       final data = <String, dynamic>{
         if (_isEdit) 'SupplierId': widget.supplier!.supplierId,
         'Name': _nameController.text.trim(),
+        'ContactPerson': _contactController.text.trim(),
         'ContactName': _contactController.text.trim(),
         'Phone': _phoneController.text.trim(),
         'Email': _emailController.text.trim(),

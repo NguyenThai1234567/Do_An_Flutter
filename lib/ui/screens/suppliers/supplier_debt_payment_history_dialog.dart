@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/image_helper.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/repositories/data_repository.dart';
+import '../../../providers/auth_provider.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/vnd_text.dart';
 import 'pay_supplier_debt_dialog.dart';
@@ -102,6 +104,8 @@ class _SupplierDebtPaymentHistoryDialogState
     final remaining = _effectiveRemainingAmount;
     final isFullyPaid = remaining <= 0 || debt.status.toLowerCase() == 'paid';
     final progress = total > 0 ? (paid / total).clamp(0.0, 1.0) : (isFullyPaid ? 1.0 : 0.0);
+    final auth = context.watch<AuthProvider>();
+    final isSupplier = auth.currentUser?.isSupplier == true;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -355,9 +359,11 @@ class _SupplierDebtPaymentHistoryDialogState
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                paid > 0
-                                    ? 'Khoản thanh toán này được cập nhật trực tiếp từ phiếu nhập kho hoặc tất toán đầu kỳ.'
-                                    : 'Nhấn nút "Thanh toán thêm" bên dưới để ghi nhận đợt trả nợ đầu tiên.',
+                                isSupplier
+                                    ? 'Chưa có ghi nhận đợt thanh toán nào từ EMarket cho khoản nợ này.'
+                                    : (paid > 0
+                                        ? 'Khoản thanh toán này được cập nhật trực tiếp từ phiếu nhập kho hoặc tất toán đầu kỳ.'
+                                        : 'Nhấn nút "Thanh toán thêm" bên dưới để ghi nhận đợt trả nợ đầu tiên.'),
                                 style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                                 textAlign: TextAlign.center,
                               ),
@@ -511,7 +517,7 @@ class _SupplierDebtPaymentHistoryDialogState
                       child: const Text('Đóng'),
                     ),
                   ),
-                  if (!isFullyPaid) ...[
+                  if (!isFullyPaid && !isSupplier) ...[
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(

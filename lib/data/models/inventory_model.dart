@@ -308,6 +308,16 @@ class PurchaseOrderModel {
   };
 }
 
+DateTime? _parseNullableDate(dynamic d) {
+  if (d == null) return null;
+  if (d is DateTime) return d;
+  try {
+    return DateTime.parse(d.toString());
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Maps to PurchaseOrderDetailDTO in EMarket.Modules.InventoryModule.DTOs
 class PurchaseOrderDetailModel {
   final int purchaseOrderDetailId;
@@ -320,6 +330,9 @@ class PurchaseOrderDetailModel {
   final String? unit;
   final double unitPrice;
   final double totalPrice;
+  final DateTime? manufacturingDate;
+  final DateTime? expiryDate;
+  final List<dynamic>? productLots;
 
   PurchaseOrderDetailModel({
     required this.purchaseOrderDetailId,
@@ -332,6 +345,9 @@ class PurchaseOrderDetailModel {
     this.unit,
     required this.unitPrice,
     required this.totalPrice,
+    this.manufacturingDate,
+    this.expiryDate,
+    this.productLots,
   });
 
   factory PurchaseOrderDetailModel.fromJson(dynamic raw) {
@@ -346,30 +362,69 @@ class PurchaseOrderDetailModel {
         totalPrice: 0,
       );
     }
+    int extractedLotId = (raw['lotId'] ?? raw['LotId'] as num?)?.toInt() ?? 0;
+    DateTime? mfg = _parseNullableDate(raw['manufacturingDate'] ?? raw['ManufacturingDate']);
+    DateTime? exp = _parseNullableDate(raw['expiryDate'] ?? raw['ExpiryDate']);
+    final rawLots = raw['productLots'] ?? raw['ProductLots'];
+
+    if (rawLots is List && rawLots.isNotEmpty) {
+      final firstLot = rawLots.first;
+      if (firstLot is Map<String, dynamic>) {
+        if (extractedLotId == 0) {
+          extractedLotId = (firstLot['lotId'] ?? firstLot['LotId'] as num?)?.toInt() ?? 0;
+        }
+        mfg ??= _parseNullableDate(firstLot['manufacturingDate'] ?? firstLot['ManufacturingDate']);
+        exp ??= _parseNullableDate(firstLot['expiryDate'] ?? firstLot['ExpiryDate']);
+      }
+    }
+
     return PurchaseOrderDetailModel(
       purchaseOrderDetailId: (raw['purchaseOrderDetailId'] ?? raw['PurchaseOrderDetailId'] as num?)?.toInt() ?? 0,
       purchaseOrderId: (raw['purchaseOrderId'] ?? raw['PurchaseOrderId'] as num?)?.toInt() ?? 0,
       productId: (raw['productId'] ?? raw['ProductId'] as num?)?.toInt() ?? 0,
       productName: (raw['productName'] ?? raw['ProductName'] ?? 'Sản phẩm').toString(),
       categoryId: (raw['categoryId'] ?? raw['CategoryId'] as num?)?.toInt() ?? 0,
-      lotId: (raw['lotId'] ?? raw['LotId'] as num?)?.toInt() ?? 0,
+      lotId: extractedLotId,
       quantity: (raw['quantity'] ?? raw['Quantity'] as num?)?.toInt() ?? 0,
       unit: raw['unit'] ?? raw['Unit'],
       unitPrice: (raw['unitPrice'] ?? raw['UnitPrice'] as num?)?.toDouble() ?? 0,
       totalPrice: (raw['totalPrice'] ?? raw['TotalPrice'] as num?)?.toDouble() ?? 0,
+      manufacturingDate: mfg,
+      expiryDate: exp,
+      productLots: rawLots is List ? rawLots : null,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'PurchaseOrderDetailId': purchaseOrderDetailId,
-    'PurchaseOrderId': purchaseOrderId,
-    'ProductId': productId,
-    'ProductName': productName,
-    'CategoryId': categoryId,
-    'LotId': lotId,
-    'Quantity': quantity,
-    'Unit': unit,
-    'UnitPrice': unitPrice,
-    'TotalPrice': totalPrice,
-  };
+  Map<String, dynamic> toJson() {
+    List<dynamic> lots = [];
+    if (productLots != null && productLots!.isNotEmpty) {
+      lots = productLots!;
+    } else {
+      lots = [
+        {
+          if (lotId > 0) 'LotId': lotId,
+          'ProductId': productId,
+          'CostPrice': unitPrice,
+          if (manufacturingDate != null) 'ManufacturingDate': manufacturingDate!.toIso8601String(),
+          if (expiryDate != null) 'ExpiryDate': expiryDate!.toIso8601String(),
+        }
+      ];
+    }
+
+    return {
+      'PurchaseOrderDetailId': purchaseOrderDetailId,
+      'PurchaseOrderId': purchaseOrderId,
+      'ProductId': productId,
+      'ProductName': productName,
+      'CategoryId': categoryId,
+      'LotId': lotId,
+      'Quantity': quantity,
+      'Unit': unit,
+      'UnitPrice': unitPrice,
+      'TotalPrice': totalPrice,
+      if (manufacturingDate != null) 'ManufacturingDate': manufacturingDate!.toIso8601String(),
+      if (expiryDate != null) 'ExpiryDate': expiryDate!.toIso8601String(),
+      'ProductLots': lots,
+    };
+  }
 }

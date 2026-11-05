@@ -35,7 +35,6 @@ class AuthProvider with ChangeNotifier, WidgetsBindingObserver {
   bool get isAuthenticated => _currentUser != null;
   List<BranchModel> get branches => _branches;
   BranchModel? get selectedBranch => _selectedBranch;
-  int? get effectiveBranchId => (_selectedBranch != null && _selectedBranch!.branchId > 0) ? _selectedBranch!.branchId : _currentUser?.branchId;
 
   /// Check if user has saved token/session và xác thực tính hợp lệ với máy chủ
   Future<void> checkAuthStatus() async {
@@ -150,10 +149,23 @@ class AuthProvider with ChangeNotifier, WidgetsBindingObserver {
     address: 'Áp dụng trên toàn bộ chuỗi siêu thị EMarket',
   );
 
-  bool get canSwitchBranch => _currentUser?.isAdmin == true;
+  bool get canSwitchBranch => _currentUser?.isAdmin == true && _currentUser?.isSupplier != true;
+  int? get effectiveBranchId {
+    if (_currentUser?.isSupplier == true) return null;
+    return (_selectedBranch != null && _selectedBranch!.branchId > 0)
+        ? _selectedBranch!.branchId
+        : _currentUser?.branchId;
+  }
 
   /// Load Branches
   Future<void> loadBranches() async {
+    if (_currentUser?.isSupplier == true) {
+      _branches = [];
+      _selectedBranch = null;
+      notifyListeners();
+      return;
+    }
+
     final rawBranches = await _repository.getBranches();
     final savedBranchId = await TokenStorage.getBranchId();
 

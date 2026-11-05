@@ -123,7 +123,7 @@ class ProductPagedResponse {
       return ProductPagedResponse(total: list.length, filtered: list.length, data: list);
     }
     if (json is Map<String, dynamic>) {
-      final list = (json['data'] ?? json['Data'] ?? json['items'] ?? json['Items'] ?? []) as List;
+      final list = (json['data'] ?? json['Data'] ?? json['items'] ?? json['Items'] ?? json['products'] ?? json['Products'] ?? []) as List;
       return ProductPagedResponse(
         total: (json['total'] ?? json['Total'] as num?)?.toInt() ?? list.length,
         filtered: (json['filtered'] ?? json['Filtered'] as num?)?.toInt() ?? list.length,

@@ -118,6 +118,8 @@ class DataRepository {
     String? keyword,
     int? categoryId,
     int? branchId,
+    int? warehouseId,
+    int? supplierId,
   }) =>
       productService.getProductsPaged(
         start: start,
@@ -125,6 +127,8 @@ class DataRepository {
         keyword: keyword,
         categoryId: categoryId,
         branchId: branchId,
+        warehouseId: warehouseId,
+        supplierId: supplierId,
       );
 
   Future<List<ProductCategoryModel>> getCategories() =>
@@ -288,6 +292,9 @@ class DataRepository {
 
   Future<bool> updatePurchase(PurchaseOrderModel order) =>
       inventoryService.updatePurchase(order);
+
+  Future<bool> updatePurchaseStatus(int purchaseOrderId, String status, {String? notes}) =>
+      inventoryService.updatePurchaseStatus(purchaseOrderId, status, notes: notes);
 
   Future<bool> deletePurchase(int purchaseOrderId) =>
       inventoryService.deletePurchase(purchaseOrderId);

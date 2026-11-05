@@ -10,12 +10,14 @@ import '../screens/pos/barcode_scanner_screen.dart';
 
 class ProductSearchPickerModal extends StatefulWidget {
   final int? branchId;
+  final int? supplierId;
   final String title;
   final bool showCostPrice;
 
   const ProductSearchPickerModal({
     super.key,
     this.branchId,
+    this.supplierId,
     this.title = 'Tìm & Chọn sản phẩm',
     this.showCostPrice = false,
   });
@@ -23,6 +25,7 @@ class ProductSearchPickerModal extends StatefulWidget {
   static Future<ProductModel?> show(
     BuildContext context, {
     int? branchId,
+    int? supplierId,
     String title = 'Tìm & Chọn sản phẩm',
     bool showCostPrice = false,
   }) {
@@ -32,6 +35,7 @@ class ProductSearchPickerModal extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (ctx) => ProductSearchPickerModal(
         branchId: branchId,
+        supplierId: supplierId,
         title: title,
         showCostPrice: showCostPrice,
       ),
@@ -69,9 +73,10 @@ class _ProductSearchPickerModalState extends State<ProductSearchPickerModal> {
     try {
       final res = await _repo.getProducts(
         start: 0,
-        length: 50,
+        length: 100,
         keyword: (query != null && query.trim().isNotEmpty) ? query.trim() : null,
         branchId: widget.branchId,
+        supplierId: widget.supplierId,
       );
       if (mounted) {
         setState(() {
@@ -153,9 +158,27 @@ class _ProductSearchPickerModalState extends State<ProductSearchPickerModal> {
                         widget.title,
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
-                      Text(
-                        _isLoading ? 'Đang tải...' : '${_products.length} sản phẩm tìm thấy',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      Row(
+                        children: [
+                          Text(
+                            _isLoading ? 'Đang tải...' : '${_products.length} sản phẩm tìm thấy',
+                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                          if (widget.supplierId != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'Lọc theo NCC',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),

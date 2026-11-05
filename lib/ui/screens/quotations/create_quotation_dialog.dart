@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/customer_model.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/models/quotation_model.dart';
 import '../../../data/repositories/data_repository.dart';
+import '../../../providers/auth_provider.dart';
 import '../../widgets/customer_search_picker_modal.dart';
 import '../../widgets/product_search_picker_modal.dart';
 import '../../widgets/interactive_quantity_stepper.dart';
@@ -131,6 +133,8 @@ class _CreateQuotationDialogState extends State<CreateQuotationDialog> {
     }
 
     setState(() => _isSaving = true);
+    final auth = context.read<AuthProvider>();
+    final userId = auth.currentUser?.userId ?? 1;
 
     try {
       final now = DateTime.now();
@@ -141,6 +145,7 @@ class _CreateQuotationDialogState extends State<CreateQuotationDialog> {
         customerName: name,
         customerPhone: _customerPhoneCtrl.text.trim().isNotEmpty ? _customerPhoneCtrl.text.trim() : null,
         branchId: widget.branchId,
+        userId: userId,
         issueDate: now,
         expiryDate: now.add(const Duration(days: 30)),
         totalAmount: _subtotal,
@@ -182,7 +187,10 @@ class _CreateQuotationDialogState extends State<CreateQuotationDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 540, maxHeight: 720),
+        constraints: BoxConstraints(
+          maxWidth: 540,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Form(

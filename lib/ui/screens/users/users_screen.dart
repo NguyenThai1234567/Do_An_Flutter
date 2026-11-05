@@ -7,6 +7,7 @@ import '../../../core/utils/device_launcher_helper.dart';
 import '../../../core/utils/image_helper.dart';
 import '../../../core/utils/responsive_layout.dart';
 import '../../../data/models/dashboard_model.dart';
+import '../../../data/models/product_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/repositories/data_repository.dart';
 import '../../../providers/auth_provider.dart';
@@ -31,6 +32,7 @@ class _UsersScreenState extends State<UsersScreen> {
   List<UserModel> _users = [];
   List<UserModel> _filteredUsers = [];
   List<BranchModel> _branches = [];
+  List<SupplierModel> _suppliers = [];
 
   @override
   void initState() {
@@ -66,12 +68,14 @@ class _UsersScreenState extends State<UsersScreen> {
       final results = await Future.wait([
         _repo.getUsers(length: 100),
         _repo.getBranches(),
+        _repo.getSuppliers(),
       ]);
 
       if (mounted) {
         setState(() {
           _users = results[0] as List<UserModel>;
           _branches = results[1] as List<BranchModel>;
+          _suppliers = results[2] as List<SupplierModel>;
           _filter();
           _isLoading = false;
         });
@@ -88,9 +92,15 @@ class _UsersScreenState extends State<UsersScreen> {
 
     setState(() {
       _filteredUsers = _users.where((u) {
-        // Scoping by branch if non-admin or branch selected
-        if (branchId != null && branchId > 0 && u.branchId != null && u.branchId != branchId) {
-          return false;
+        // Scoping by branch if non-admin or specific branch selected
+        if (branchId != null && branchId > 0) {
+          if (u.isSupplier) {
+            // Đối tác Nhà cung cấp không thuộc chi nhánh cửa hàng cụ thể nào,
+            // chỉ hiển thị khi xem toàn hệ thống.
+            return false;
+          } else if (u.branchId != null && u.branchId != branchId) {
+            return false;
+          }
         }
 
         if (query.isEmpty) return true;
@@ -99,7 +109,12 @@ class _UsersScreenState extends State<UsersScreen> {
         final username = u.username.toLowerCase();
         final phone = (u.phone ?? '').toLowerCase();
         final role = u.primaryRoleName.toLowerCase();
-        return name.contains(query) || username.contains(query) || phone.contains(query) || role.contains(query);
+        final affiliation = _getUserAffiliation(u).toLowerCase();
+        return name.contains(query) ||
+            username.contains(query) ||
+            phone.contains(query) ||
+            role.contains(query) ||
+            affiliation.contains(query);
       }).toList();
     });
   }
@@ -120,10 +135,15 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
-  String _getBranchName(int? branchId) {
-    if (branchId == null || branchId == 0) return 'Tất cả chi nhánh';
-    final b = _branches.where((x) => x.branchId == branchId);
-    return b.isNotEmpty ? b.first.name : 'Chi nhánh #$branchId';
+  String _getUserAffiliation(UserModel user) {
+    if (user.isSupplier || (user.supplierId != null && user.supplierId! > 0)) {
+      final s = _suppliers.where((x) => x.supplierId == user.supplierId);
+      if (s.isNotEmpty) return 'NCC: ${s.first.name}';
+      return user.supplierId != null ? 'NCC #${user.supplierId}' : 'Đối tác Nhà cung cấp';
+    }
+    if (user.branchId == null || user.branchId == 0) return 'Tất cả chi nhánh';
+    final b = _branches.where((x) => x.branchId == user.branchId);
+    return b.isNotEmpty ? b.first.name : 'Chi nhánh #${user.branchId}';
   }
 
   Future<void> _toggleLock(UserModel user) async {
@@ -590,11 +610,28 @@ class _UsersScreenState extends State<UsersScreen> {
                         ),
                         Expanded(
                           flex: 3,
-                          child: Text(
-                            _getBranchName(user.branchId),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                user.isSupplier ? Icons.local_shipping_outlined : Icons.store_mall_directory_outlined,
+                                size: 14,
+                                color: user.isSupplier ? AppColors.primaryBrand : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _getUserAffiliation(user),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: user.isSupplier ? FontWeight.w600 : FontWeight.normal,
+                                    color: user.isSupplier ? AppColors.primaryBrand : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         Expanded(
@@ -746,12 +783,20 @@ class _UsersScreenState extends State<UsersScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.store_mall_directory_outlined, size: 14, color: AppColors.textSecondary),
+              Icon(
+                user.isSupplier ? Icons.local_shipping_outlined : Icons.store_mall_directory_outlined,
+                size: 14,
+                color: user.isSupplier ? AppColors.primaryBrand : AppColors.textSecondary,
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  _getBranchName(user.branchId),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  _getUserAffiliation(user),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: user.isSupplier ? FontWeight.w600 : FontWeight.normal,
+                    color: user.isSupplier ? AppColors.primaryBrand : AppColors.textSecondary,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

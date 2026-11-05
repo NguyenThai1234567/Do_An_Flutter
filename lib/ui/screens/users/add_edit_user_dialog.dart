@@ -59,11 +59,20 @@ class _AddEditUserDialogState extends State<AddEditUserDialog> {
 
   bool _isSupplierRole(RoleModel? role) {
     if (role == null) return false;
-    final lower = role.roleName.toLowerCase();
+    final lower = role.roleName.toLowerCase().trim();
     return role.roleId == 6 ||
+        lower == 'partner' ||
+        lower == 'supplier' ||
+        lower == 'ncc' ||
         lower.contains('nhà cung cấp') ||
+        lower.contains('nha cung cap') ||
+        lower.contains('cung cấp') ||
+        lower.contains('cung cap') ||
         lower.contains('ncc') ||
-        lower.contains('supplier');
+        lower.contains('supplier') ||
+        lower.contains('đối tác') ||
+        lower.contains('doi tac') ||
+        lower.contains('partner');
   }
 
   bool get _isSupplierMode => _isSupplierRole(_selectedRole);
@@ -113,16 +122,22 @@ class _AddEditUserDialogState extends State<AddEditUserDialog> {
                 ? widget.user!.roleId
                 : (widget.user!.roles.isNotEmpty ? widget.user!.roles.first.roleId : 0);
             _selectedRole = _roles.firstWhere(
-              (r) => r.roleId == targetRoleId,
+              (r) => r.roleId == targetRoleId || (_isSupplierRole(r) && widget.user!.isSupplier),
               orElse: () => _roles.isNotEmpty ? _roles.first : RoleModel(roleId: 0, roleName: 'Nhân viên'),
             );
 
             // Match selected supplier (chỉ giữ khi Role là Nhà cung cấp)
-            if (_isSupplierMode && widget.user!.supplierId != null && widget.user!.supplierId! > 0 && _suppliers.isNotEmpty) {
-              _selectedSupplier = _suppliers.firstWhere(
-                (s) => s.supplierId == widget.user!.supplierId,
-                orElse: () => _suppliers.first,
-              );
+            if (_isSupplierMode && widget.user!.supplierId != null && widget.user!.supplierId! > 0) {
+              final matched = _suppliers.where((s) => s.supplierId == widget.user!.supplierId);
+              if (matched.isNotEmpty) {
+                _selectedSupplier = matched.first;
+              } else {
+                _repo.getSupplierById(widget.user!.supplierId!).then((s) {
+                  if (s != null && mounted) {
+                    setState(() => _selectedSupplier = s);
+                  }
+                });
+              }
             } else {
               _selectedSupplier = null;
             }
@@ -144,6 +159,8 @@ class _AddEditUserDialogState extends State<AddEditUserDialog> {
             if (_roles.isNotEmpty) _selectedRole = _roles.first;
             if (!_isSupplierMode && _branches.isNotEmpty) {
               _selectedBranch = _branches.first;
+            } else {
+              _selectedBranch = null;
             }
           }
 
@@ -237,6 +254,7 @@ class _AddEditUserDialogState extends State<AddEditUserDialog> {
       // Quy định EMarket: Nếu Role là Nhà cung cấp thì gắn SupplierId và ẩn/xóa BranchId; ngược lại gắn BranchId và xóa SupplierId
       'BranchId': _isSupplierMode ? null : _selectedBranch?.branchId,
       'SupplierId': _isSupplierMode ? _selectedSupplier?.supplierId : null,
+      'IsSupplier': _isSupplierMode,
       'RoleId': _selectedRole?.roleId ?? 1,
       'RoleIds': _selectedRole != null ? [_selectedRole!.roleId] : [1],
       if (!_isEdit && _passwordCtrl.text.trim().isNotEmpty) 'Password': _passwordCtrl.text.trim(),

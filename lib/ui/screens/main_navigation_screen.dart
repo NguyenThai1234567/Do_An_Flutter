@@ -12,6 +12,7 @@ import 'inventory/warehouse_screen.dart';
 import 'pos/pos_screen.dart';
 import 'products/products_screen.dart';
 import 'profile/profile_screen.dart';
+import 'suppliers/suppliers_screen.dart';
 
 class NavigationItem {
   final Widget screen;
@@ -37,6 +38,36 @@ class MainNavigationScreen extends StatefulWidget {
   static List<NavigationItem> getAvailableItems(UserModel? user) {
     if (user == null) {
       return [
+        const NavigationItem(
+          screen: ProfileScreen(),
+          icon: Icon(Icons.person_outline),
+          selectedIcon: Icon(Icons.person, color: AppColors.primaryBrand),
+          label: 'Tài khoản',
+          destination: NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person, color: AppColors.primaryBrand),
+            label: 'Tài khoản',
+          ),
+          module: 'ProfileModule',
+        ),
+      ];
+    }
+
+    // Tài khoản đối tác Nhà cung cấp: Chỉ có quyền xem Công nợ NCC và Tài khoản cá nhân
+    if (user.isSupplier) {
+      return [
+        const NavigationItem(
+          screen: SuppliersScreen(),
+          icon: Icon(Icons.account_balance_wallet_outlined),
+          selectedIcon: Icon(Icons.account_balance_wallet_rounded, color: AppColors.primaryBrand),
+          label: 'Công nợ NCC',
+          destination: NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded, color: AppColors.primaryBrand),
+            label: 'Công nợ NCC',
+          ),
+          module: 'SupplierModule',
+        ),
         const NavigationItem(
           screen: ProfileScreen(),
           icon: Icon(Icons.person_outline),

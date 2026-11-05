@@ -2,10 +2,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/repositories/data_repository.dart';
+import '../../../providers/auth_provider.dart';
 import 'supplier_debt_payment_history_dialog.dart';
 
 class PaySupplierDebtDialog extends StatefulWidget {
@@ -23,6 +25,17 @@ class PaySupplierDebtDialog extends StatefulWidget {
     required SupplierDebtModel debt,
     required VoidCallback onPaid,
   }) {
+    final auth = context.read<AuthProvider>();
+    if (auth.currentUser?.isSupplier == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tài khoản đối tác Nhà cung cấp không có quyền tạo thanh toán công nợ.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return Future.value();
+    }
+
     return showDialog(
       context: context,
       barrierDismissible: false,

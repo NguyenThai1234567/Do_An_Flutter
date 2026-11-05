@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/utils/formatters.dart';
@@ -12,6 +13,8 @@ import '../../widgets/flat_card.dart';
 import '../../widgets/modern_action_sheet.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/vnd_text.dart';
+import '../../../data/models/order_model.dart';
+import '../pos/receipt_preview_dialog.dart';
 import 'create_quotation_dialog.dart';
 
 class QuotationsScreen extends StatefulWidget {
@@ -171,6 +174,62 @@ class _QuotationsScreenState extends State<QuotationsScreen> with SingleTickerPr
     }
   }
 
+  Future<void> _handlePrintReceiptForQuotation(QuotationModel detail) async {
+    final orderId = detail.convertedOrderId ?? 0;
+    OrderModel? order;
+    if (orderId > 0) {
+      try {
+        order = await _repository.getOrderDetail(orderId);
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    final checkoutItems = (order != null && order.details.isNotEmpty)
+        ? order.details
+            .map((d) => CheckoutItemRequest(
+                  productId: d.productId,
+                  quantity: d.quantity,
+                  price: d.unitPrice,
+                  discount: d.discount,
+                ))
+            .toList()
+        : detail.details
+            .map((d) => CheckoutItemRequest(
+                  productId: d.productId,
+                  quantity: d.quantity,
+                  price: d.unitPrice,
+                  discount: 0,
+                ))
+            .toList();
+
+    final productNames = (order != null && order.details.isNotEmpty)
+        ? {for (var d in order.details) d.productId: d.productName}
+        : {for (var d in detail.details) d.productId: d.productName};
+
+    final totalAmount = order?.totalAmount ?? detail.finalAmount;
+    final discount = order?.details.fold(0.0, (sum, item) => sum + item.discount) ?? 0.0;
+    final orderCode = order?.orderCode ?? (orderId > 0 ? '#ORD-$orderId' : detail.quotationCode);
+    final paymentMethod = order?.paymentMethod ?? 'Tiền mặt';
+
+    final auth = context.read<AuthProvider>();
+    final branchName = detail.branchName ?? 'Chi nhánh EMarket';
+    final cashierName = auth.currentUser?.fullName ?? 'Nhân viên';
+
+    ReceiptPreviewDialog.show(
+      context,
+      orderId: orderId > 0 ? orderId : detail.quotationId,
+      orderCode: orderCode,
+      totalAmount: totalAmount,
+      discount: discount,
+      paymentMethod: paymentMethod,
+      cashierName: cashierName,
+      branchName: branchName,
+      items: checkoutItems,
+      productNames: productNames,
+    );
+  }
+
   void _showDetailModal(QuotationModel q) {
     showModalBottomSheet(
       context: context,
@@ -323,6 +382,58 @@ class _QuotationsScreenState extends State<QuotationsScreen> with SingleTickerPr
                             _convertToOrder(detail);
                           },
                         ),
+                      if (detail.status.toLowerCase() == 'converted' ||
+                          (detail.convertedOrderId != null && detail.convertedOrderId! > 0)) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                detail.convertedOrderId != null && detail.convertedOrderId! > 0
+                                    ? 'Mã QR Đơn hàng (#ORD-${detail.convertedOrderId})'
+                                    : 'Mã QR Đơn hàng',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 12),
+                              // QR Code
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: QrImageView(
+                                  data: detail.convertedOrderId != null && detail.convertedOrderId! > 0
+                                      ? 'EMARKET-ORD:${detail.convertedOrderId}|#ORD-${detail.convertedOrderId}'
+                                      : 'EMARKET-ORD:0|${detail.quotationCode}',
+                                  version: QrVersions.auto,
+                                  size: 140,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryBrand,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  elevation: 0,
+                                ),
+                                icon: const Icon(Icons.print_outlined, size: 18),
+                                label: const Text('In hóa đơn (Bill)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                onPressed: () => _handlePrintReceiptForQuotation(detail),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 );

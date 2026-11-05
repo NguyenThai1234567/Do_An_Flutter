@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/device_launcher_helper.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/repositories/data_repository.dart';
+import '../../../providers/auth_provider.dart';
+import '../main_navigation_screen.dart';
 import 'add_edit_supplier_dialog.dart';
 import 'pay_supplier_debt_dialog.dart';
 import 'supplier_debt_payment_history_dialog.dart';
@@ -187,34 +190,44 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context, _hasChanged),
-          ),
+          automaticallyImplyLeading: false,
+          leading: Navigator.canPop(context)
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.pop(context, _hasChanged),
+                )
+              : MainNavigationScreen.buildLeadingMenuButton(context),
           title: Text(
             _currentSupplier.name,
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
           ),
           actions: [
-            IconButton(
-              tooltip: 'Chỉnh sửa NCC',
-              icon: const Icon(Icons.edit_outlined),
-              onPressed: () {
-                AddEditSupplierDialog.show(
-                  context,
-                  supplier: _currentSupplier,
-                  onSaved: () {
-                    _hasChanged = true;
-                    _loadData();
-                  },
-                );
-              },
-            ),
+            if (context.watch<AuthProvider>().currentUser?.isSupplier != true)
+              IconButton(
+                tooltip: 'Chỉnh sửa NCC',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () {
+                  AddEditSupplierDialog.show(
+                    context,
+                    supplier: _currentSupplier,
+                    onSaved: () {
+                      _hasChanged = true;
+                      _loadData();
+                    },
+                  );
+                },
+              ),
             IconButton(
               tooltip: 'Tải lại',
               icon: const Icon(Icons.refresh_rounded),
               onPressed: _loadData,
             ),
+            IconButton(
+              tooltip: 'Danh mục phân hệ',
+              icon: const Icon(Icons.menu_rounded),
+              onPressed: () => MainNavigationScreen.openDrawer(context),
+            ),
+            const SizedBox(width: 4),
           ],
         ),
         body: _isLoading
@@ -715,7 +728,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
-                if (hasDue) ...[
+                if (hasDue && context.read<AuthProvider>().currentUser?.isSupplier != true) ...[
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: () {

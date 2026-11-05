@@ -188,6 +188,41 @@ class InventoryApiService {
     }
   }
 
+  /// Update purchase order status directly (e.g. Completed, Cancelled)
+  Future<bool> updatePurchaseStatus(int purchaseOrderId, String status, {String? notes}) async {
+    try {
+      final res = await _client.post(
+        '${ApiEndpoints.purchaseOrders}/$purchaseOrderId/status',
+        data: {
+          'PurchaseOrderId': purchaseOrderId,
+          'Status': status,
+          if (notes != null) 'Notes': notes,
+        },
+      );
+      if (res.data is Map<String, dynamic>) {
+        return res.data['success'] ?? res.data['Success'] ?? true;
+      }
+      return res.statusCode == 200;
+    } catch (_) {
+      try {
+        final fallback = await _client.post(
+          '${ApiEndpoints.purchaseOrders}/status',
+          data: {
+            'PurchaseOrderId': purchaseOrderId,
+            'Status': status,
+            if (notes != null) 'Notes': notes,
+          },
+        );
+        if (fallback.data is Map<String, dynamic>) {
+          return fallback.data['success'] ?? fallback.data['Success'] ?? true;
+        }
+        return fallback.statusCode == 200;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
   /// Delete or cancel purchase order
   Future<bool> deletePurchase(int purchaseOrderId) async {
     try {

@@ -131,7 +131,13 @@ class QuotationModel {
       finalAmount: (json['finalAmount'] as num? ?? json['FinalAmount'] as num? ?? 0).toDouble(),
       status: (json['status'] ?? json['Status'] ?? 'Draft').toString(),
       note: json['note'] ?? json['Note'],
-      convertedOrderId: json['convertedOrderId'] as int? ?? json['ConvertedOrderId'] as int?,
+      convertedOrderId: (json['convertedOrderId'] ??
+              json['ConvertedOrderId'] ??
+              json['converted_order_id'] ??
+              json['Converted_Order_Id'] ??
+              json['orderId'] ??
+              json['OrderId'] as num?)
+          ?.toInt(),
       details: rawDetails.map((e) => QuotationDetailModel.fromJson(e as Map<String, dynamic>)).toList(),
     );
   }

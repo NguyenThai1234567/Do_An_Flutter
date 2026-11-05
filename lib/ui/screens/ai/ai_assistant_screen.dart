@@ -203,6 +203,43 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    if (auth.currentUser?.isSupplier == true) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Trợ lý AI & Dự báo Thông minh')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock_person_outlined, size: 40, color: AppColors.error),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Không có quyền truy cập',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tài khoản đối tác Nhà cung cấp không được phân quyền sử dụng tính năng Trợ lý AI và phân tích nội bộ.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final isCompact = MediaQuery.sizeOf(context).width < 640;
 
     return Scaffold(
